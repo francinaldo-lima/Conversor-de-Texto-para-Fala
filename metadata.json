@@ -1,0 +1,6 @@
+{
+  "name": "Conversor de Texto para Fala",
+  "description": "Um aplicativo intuitivo de conversão de texto para fala em português, com escolha de vozes expressivas, velocidade ajustável, salvamento de preferências e download do áudio.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
