@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import dns from "dns";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 
@@ -106,6 +105,7 @@ app.get("/api/health", (req, res) => {
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     // Import Vite middleware dynamically in development mode
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
