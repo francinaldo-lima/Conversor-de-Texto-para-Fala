@@ -293,41 +293,66 @@ export default function App() {
           const synth = window.speechSynthesis;
           synth.cancel(); // clean queue
 
-          const utterance = new SpeechSynthesisUtterance(text);
-          localSpeechUtteranceRef.current = utterance;
+          // Cleanly split text into chunks/sentences so long inputs do not get cut off by browser bugs
+          const sentences = text
+            .match(/[^.!?\n\r]+[.!?\n\r]*/g)
+            ?.map(s => s.trim())
+            .filter(s => s.length > 0) || [text];
 
-          // Set voice if configured
-          if (localVoiceURI) {
-            const v = localVoices.find(x => x.voiceURI === localVoiceURI);
-            if (v) {
-              utterance.voice = v;
-            }
+          if (sentences.length === 0) {
+            setIsGenerating(false);
+            return;
           }
 
-          utterance.rate = speed;
-          utterance.pitch = pitch;
+          let currentIndex = 0;
+          setIsPlaying(true);
+          setIsGenerating(false);
 
-          utterance.onstart = () => {
-            setIsPlaying(true);
-            setIsGenerating(false);
-          };
-
-          utterance.onend = () => {
-            setIsPlaying(false);
-          };
-
-          utterance.onerror = (evt) => {
-            setIsPlaying(false);
-            setIsGenerating(false);
-            console.error("Conversão local falhou:", evt);
-            if (evt.error !== "interrupted") {
-              setError(`Erro na síntese de voz do navegador: ${evt.error}`);
+          const speakNextChunk = () => {
+            if (!window.speechSynthesis || currentIndex >= sentences.length) {
+              setIsPlaying(false);
+              return;
             }
+
+            const currentSentence = sentences[currentIndex];
+            const utterance = new SpeechSynthesisUtterance(currentSentence);
+            localSpeechUtteranceRef.current = utterance;
+
+            // Apply selected local voice config
+            if (localVoiceURI) {
+              const v = localVoices.find(x => x.voiceURI === localVoiceURI);
+              if (v) {
+                utterance.voice = v;
+              }
+            }
+
+            utterance.rate = speed;
+            utterance.pitch = pitch;
+
+            utterance.onend = () => {
+              currentIndex++;
+              // Delay slightly between sentences for a more natural breathing pause
+              setTimeout(speakNextChunk, 200);
+            };
+
+            utterance.onerror = (evt) => {
+              console.warn("Aviso na síntese local:", evt);
+              if (evt.error === "interrupted") {
+                setIsPlaying(false);
+                return;
+              }
+              // Skip failed chunk and continue to next
+              currentIndex++;
+              speakNextChunk();
+            };
+
+            synth.speak(utterance);
           };
 
-          synth.speak(utterance);
+          speakNextChunk();
         } catch (err: any) {
           setIsGenerating(false);
+          setIsPlaying(false);
           setError("Erro ao processar síntese de voz no navegador.");
         }
       }, 100);
@@ -468,8 +493,28 @@ export default function App() {
         
         {/* Alerts Center */}
         <div className="lg:col-span-12 space-y-3">
+          {/* Vercel / External Host Static Warning Notice */}
+          {typeof window !== "undefined" && window.location.hostname.includes("vercel.app") && engine === "gemini" && (
+            <div className="bg-amber-500/10 border border-amber-500/20 text-amber-200 p-4 rounded-xl flex flex-col sm:flex-row items-start gap-3 shadow-md animate-fadeIn" id="vercel-host-notice">
+              <span className="text-lg shrink-0">💡</span>
+              <div className="flex-1 text-xs leading-relaxed">
+                <strong className="block text-amber-400 font-medium mb-1 text-sm">Olá! Hospedagem Estática Vercel Detectada</strong>
+                Como o seu site está hospedado na Vercel (que é uma plataforma apenas de frontend estático), a conversão de IA do <strong>Estúdio IA</strong> requer o servidor backend ativo. Para falar qualquer texto instantaneamente sem limites na Vercel, mude abaixo para as <strong>Vozes do Navegador</strong> (tudo é processado em tempo real no seu dispositivo)!
+              </div>
+              <button
+                onClick={() => {
+                  setEngine("local");
+                  showTemporarySuccess("Silenciosamente alterado para Vozes do Navegador!");
+                }}
+                className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3 py-2 rounded-lg text-xs shrink-0 self-end sm:self-start transition cursor-pointer"
+              >
+                Ativar Vozes do Navegador
+              </button>
+            </div>
+          )}
+
           {error && (
-            <div className="bg-red-950/40 border border-red-505/30 text-red-100 p-4 rounded-xl flex flex-col sm:flex-row items-start gap-3 shadow-md transition-all duration-150 animate-fadeIn" id="error-alert">
+            <div className="bg-red-950/40 border border-red-500/30 text-red-100 p-4 rounded-xl flex flex-col sm:flex-row items-start gap-3 shadow-md transition-all duration-150 animate-fadeIn" id="error-alert">
               <div className="flex items-start gap-3 flex-1">
                 <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
                 <div className="flex-1">
