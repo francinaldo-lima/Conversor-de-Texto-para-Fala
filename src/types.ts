@@ -8,6 +8,7 @@ export interface UserPreferences {
   speed: number;
   pitch: number;
   autoSave: boolean;
+  customApiUrl?: string;
 }
 
 export interface VoiceOption {

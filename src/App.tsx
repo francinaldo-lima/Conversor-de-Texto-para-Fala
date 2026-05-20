@@ -35,6 +35,10 @@ export default function App() {
   const [speed, setSpeed] = useState<number>(1.0);
   const [pitch, setPitch] = useState<number>(1.0);
   
+  // --- Custom API Redirection states for Vercel/External Hosts ---
+  const [customApiUrl, setCustomApiUrl] = useState<string>("");
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+  
   // --- Audio Track Processing states ---
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -108,6 +112,7 @@ export default function App() {
         if (prefs.localVoiceURI) setLocalVoiceURI(prefs.localVoiceURI);
         if (prefs.speed) setSpeed(prefs.speed);
         if (prefs.pitch) setPitch(prefs.pitch);
+        if (prefs.customApiUrl) setCustomApiUrl(prefs.customApiUrl);
       } catch (err) {
         console.error("Erro ao carregar preferências de voz:", err);
       }
@@ -131,7 +136,8 @@ export default function App() {
         localVoiceURI,
         speed,
         pitch,
-        autoSave: true
+        autoSave: true,
+        customApiUrl: customApiUrl
       };
       localStorage.setItem("tts_studio_preferences", JSON.stringify(prefs));
       
@@ -193,7 +199,25 @@ export default function App() {
       setIsGenerating(true);
       try {
         const selectedStyle = geminiStyles.find(s => s.id === geminiStyle)?.promptPart || "natural";
-        const response = await fetch("/api/tts", {
+        
+        // Dynamic absolute API URL fallback detection (such as Vercel)
+        let resolvedApiUrl = "/api/tts";
+        if (customApiUrl.trim()) {
+          resolvedApiUrl = customApiUrl.trim();
+        } else {
+          const isNotOnPrimaryServer = 
+            typeof window !== "undefined" && 
+            !window.location.hostname.includes("run.app") && 
+            !window.location.hostname.includes("localhost") && 
+            !window.location.hostname.includes("127.0.0.1") &&
+            !window.location.hostname.includes("webcontainer.io");
+
+          if (isNotOnPrimaryServer) {
+            resolvedApiUrl = "https://ais-pre-fj6fpurayej3b3hioeytig-324247564679.us-west1.run.app/api/tts";
+          }
+        }
+
+        const response = await fetch(resolvedApiUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -205,12 +229,21 @@ export default function App() {
           }),
         });
 
-        if (!response.ok) {
-          const errData = await response.json();
-          throw new Error(errData.error || "Houve uma falha na geração do áudio pelo servidor.");
+        const responseText = await response.text();
+        let data: any;
+        try {
+          data = JSON.parse(responseText);
+        } catch (e) {
+          throw new Error(
+            `O servidor de destino retornou uma resposta não-JSON. Isso costuma acontecer quando o app é hospedado estaticamente (como na Vercel) e não consegue falar com o servidor Node local. ` +
+            `Para corrigir, digite a URL absoluta do seu backend em "Configurações Avançadas de API" abaixo. Resposta obtida: "${responseText.substring(0, 110)}..."`
+          );
         }
 
-        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "Houve uma falha na geração do áudio pelo servidor.");
+        }
+
         if (data.audioBase64) {
           // Convert the raw PCM base64 payload into a readable WAV format Blob
           const wavBlob = pcmToWavBlob(data.audioBase64, data.sampleRate || 24000);
@@ -842,6 +875,60 @@ export default function App() {
               </div>
             </div>
           )}
+
+          {/* Advanced API Config Section */}
+          <div className="bg-slate-950/20 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="text-xs text-slate-400 hover:text-slate-200 transition flex items-center justify-between w-full font-semibold uppercase tracking-wider"
+              id="toggle-advanced-api-btn"
+            >
+              <span>⚙️ Configurações Avançadas de API</span>
+              <span>{showAdvanced ? "Ocultar ▲" : "Mostrar ▼"}</span>
+            </button>
+            
+            {showAdvanced && (
+              <div className="space-y-3 pt-2 border-t border-slate-900 animate-fadeIn bg-slate-950/40 p-1 rounded-lg">
+                <p className="text-[11px] text-slate-400 leading-normal">
+                  Se você hospedou esse aplicativo de forma estática (ex: Vercel) e quer conectá-lo com as vozes de IA do seu servidor backend da Google Cloud Run, cole o link absoluto do seu endpoint abaixo:
+                </p>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-slate-455 font-mono">ENDPOINT ABSOLUTO:</label>
+                  <input
+                    type="text"
+                    value={customApiUrl}
+                    onChange={(e) => setCustomApiUrl(e.target.value)}
+                    placeholder="https://sua-url-gcp.run.app/api/tts"
+                    className="w-full bg-slate-900 border border-slate-800 focus:border-emerald-500/50 outline-none rounded-xl px-3 py-2 text-xs text-slate-200 font-mono"
+                    id="custom-api-input"
+                  />
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    onClick={() => {
+                      setCustomApiUrl("https://ais-pre-fj6fpurayej3b3hioeytig-324247564679.us-west1.run.app/api/tts");
+                      showTemporarySuccess("Endpoint atualizado para o Cloud Run Backend da nuvem principal!");
+                    }}
+                    type="button"
+                    className="text-[10px] bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white px-2.5 py-1.5 rounded-lg border border-slate-800 transition"
+                  >
+                    Usar Backend Principal (GCP Cloud Run)
+                  </button>
+                  <button
+                    onClick={() => {
+                      setCustomApiUrl("");
+                      showTemporarySuccess("Restaurado para auto-detecção local!");
+                    }}
+                    type="button"
+                    className="text-[10px] text-slate-400 hover:text-red-400 px-2 py-1.5 transition ml-auto"
+                  >
+                    Auto-Detecção
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* User Guide Card */}
           <div className="bg-slate-950/40 border border-slate-850 rounded-2xl p-4 text-xs text-slate-400 leading-normal flex flex-col gap-2.5">
