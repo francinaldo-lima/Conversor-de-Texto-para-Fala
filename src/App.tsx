@@ -540,6 +540,26 @@ export default function App() {
                       </button>
                     </div>
                   )}
+
+                  {/* Smart auto detection of Quota Exceeded / 429 issues */}
+                  {(error.toLowerCase().includes("quota") || error.toLowerCase().includes("429") || error.toLowerCase().includes("cota") || error.toLowerCase().includes("limite de cota") || error.toLowerCase().includes("resource_exhausted")) && (
+                    <div className="mt-3 bg-amber-500/10 p-3 rounded-lg border border-amber-500/20 text-xs text-amber-200 flex flex-col gap-2 animate-fadeIn">
+                      <span className="leading-relaxed">
+                        ⚡ <strong>Uso Gratuito Sem Limites:</strong> No plano gratuito do Estúdio IA (Google Gemini), há limites de requisições por minuto.
+                        Para continuar convertendo imediatamente e sem limites, basta mudar para as <strong>Vozes do Navegador</strong>! Tudo será processado na hora em seu dispositivo.
+                      </span>
+                      <button
+                        onClick={() => {
+                          setEngine("local");
+                          setError(null);
+                          showTemporarySuccess("Alterado para o motor de Vozes do Navegador (Uso Ilimitado)!");
+                        }}
+                        className="bg-amber-500 hover:bg-amber-400 text-slate-950 px-3.5 py-1.5 rounded-lg font-bold text-xs w-fit cursor-pointer transition-all active:scale-95"
+                      >
+                        👉 Ativar Vozes do Navegador (Uso Ilimitado)
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
               <button onClick={() => setError(null)} className="text-slate-400 hover:text-slate-200 text-xs px-2.5 py-1.5 bg-red-900/20 hover:bg-red-900/40 rounded transition shrink-0 self-end sm:self-start">

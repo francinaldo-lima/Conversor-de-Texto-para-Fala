@@ -91,8 +91,39 @@ app.post("/api/tts", async (req, res) => {
     });
   } catch (error: any) {
     console.error("Erro no processamento da rota /api/tts:", error);
+    
+    let msg = error.message || String(error);
+    
+    // Parse nested JSON strings if present in the message
+    try {
+      const jsonStart = msg.indexOf("{");
+      const jsonEnd = msg.lastIndexOf("}");
+      if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+        const jsonStr = msg.substring(jsonStart, jsonEnd + 1);
+        const parsed = JSON.parse(jsonStr);
+        if (parsed.error && parsed.error.message) {
+          msg = parsed.error.message;
+        } else if (parsed.message) {
+          msg = parsed.message;
+        }
+      }
+    } catch (e) {
+      // ignore parsing error
+    }
+
+    // Handle typical raw quota or translation limits
+    if (
+      msg.toLowerCase().includes("quota") ||
+      msg.toLowerCase().includes("exceeded") ||
+      msg.toLowerCase().includes("429") ||
+      msg.toLowerCase().includes("resource_exhausted") ||
+      msg.toLowerCase().includes("limit")
+    ) {
+      msg = "Limite de cota de IA excedido (Erro 429: Quota Exceeded). Como este aplicativo utiliza a API gratuita do Google Gemini para síntese de voz nativa, existem limites temporários de requisições por minuto. Por favor, aguarde de 30 a 60 segundos antes de tentar novamente, ou alterne para as 'Vozes do Navegador' ao lado para uso ilimitado e sem limites temporários!";
+    }
+
     return res.status(500).json({
-      error: error.message || "Erro desconhecido ao processar conversão TTS de áudio.",
+      error: msg,
     });
   }
 });
