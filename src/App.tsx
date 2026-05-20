@@ -272,7 +272,11 @@ export default function App() {
         }
       } catch (err: any) {
         console.error("Erro na síntese da IA:", err);
-        setError(err.message || "Erro de conexão com o estúdio de IA. Verifique as configurações e tente novamente.");
+        let errorMsg = err.message || "Erro de conexão com o estúdio de IA. Verifique as configurações e tente novamente.";
+        if (errorMsg.includes("Failed to fetch") || errorMsg.toLowerCase().includes("fetch")) {
+          errorMsg = "Falha na conexão de rede (Failed to fetch). Quando o aplicativo é executado em plataformas externas como Vercel, o navegador pode bloquear o acesso direto por políticas de CORS ou ausência de servidor Node ativo. Mude para 'Vozes do Navegador' ao lado para funcionar 100% de forma autônoma!";
+        }
+        setError(errorMsg);
       } finally {
         setIsGenerating(false);
       }
@@ -465,13 +469,35 @@ export default function App() {
         {/* Alerts Center */}
         <div className="lg:col-span-12 space-y-3">
           {error && (
-            <div className="bg-red-950/40 border border-red-500/30 text-red-100 p-4 rounded-xl flex items-start gap-3 shadow-md transition-all duration-150 animate-fadeIn" id="error-alert">
-              <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <span className="font-semibold block text-sm">Ocorreu um problema</span>
-                <p className="text-xs text-red-300 mt-1">{error}</p>
+            <div className="bg-red-950/40 border border-red-505/30 text-red-100 p-4 rounded-xl flex flex-col sm:flex-row items-start gap-3 shadow-md transition-all duration-150 animate-fadeIn" id="error-alert">
+              <div className="flex items-start gap-3 flex-1">
+                <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <span className="font-semibold block text-sm">Ocorreu um problema</span>
+                  <p className="text-xs text-red-300 mt-1 leading-normal">{error}</p>
+                  
+                  {/* Smart auto detection of Network / Vercel Host issues */}
+                  {(error.toLowerCase().includes("fetch") || error.toLowerCase().includes("json") || error.toLowerCase().includes("conexão")) && (
+                    <div className="mt-3 bg-red-500/10 p-3 rounded-lg border border-red-500/20 text-xs text-red-200 flex flex-col gap-2">
+                      <span className="leading-relaxed">
+                        💡 <strong>Hospedagem Estática de Terceiros Detectada:</strong> O servidor inteligente Cloud Run está protegido para o seu e-mail de segurança, ou você está rodando apenas o front-end estático (Vercel).
+                        Ao usar as <strong>Vozes do Navegador</strong> ao lado, as conversões ocorrem 100% no seu dispositivo de forma independente e síncrona.
+                      </span>
+                      <button
+                        onClick={() => {
+                          setEngine("local");
+                          setError(null);
+                          showTemporarySuccess("Alterado com sucesso para o motor de Vozes nativas do Navegador!");
+                        }}
+                        className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3.5 py-1.5 rounded-lg font-bold text-xs w-fit cursor-pointer transition-all active:scale-95"
+                      >
+                        👉 Ativar Vozes do Navegador (Funciona na Vercel!)
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-              <button onClick={() => setError(null)} className="text-slate-400 hover:text-slate-200 text-xs px-2 py-1 bg-red-900/20 hover:bg-red-900/40 rounded transition">
+              <button onClick={() => setError(null)} className="text-slate-400 hover:text-slate-200 text-xs px-2.5 py-1.5 bg-red-900/20 hover:bg-red-900/40 rounded transition shrink-0 self-end sm:self-start">
                 Fechar
               </button>
             </div>
